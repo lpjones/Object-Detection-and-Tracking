@@ -63,11 +63,22 @@ if len(args.input_files) < 4:
             <Weights file>   <config file>   <labels file>  <Image/Images path>")
     exit(0)
 
-# Check for valid file paths
-for file in args.input_files:
-    if not os.path.isfile(file):
-        print(f"{file} is not a valid file path")
-        exit(0)
+imgs = []
+# Check if input image path is a directory
+if os.path.isdir(args.input_files[3]):
+    # If it is a directory pull out images from directory
+    for file in os.listdir(args.input_files[3]):
+        if file.endswith('.jpg'):
+            imgs.append(args.input_files[3] + file)
+else:
+    # Check for valid file paths
+    for file in args.input_files:
+        if not os.path.isfile(file):
+            print(f"{file} is not a valid file path")
+            exit(0)
+    imgs = args.input_files[3:]
+
+print(imgs)
 
 try:
     labels = pd.read_csv(args.input_files[2])
@@ -84,8 +95,6 @@ if args.classes_all:
 if args.inf: # True value is stored in args.inf
     print("-inf is selected")
 
-print(cv2.__version__)
-
 # Load YOLO model
 def load_YOLO(model_architecture, model_weights):
     try:
@@ -98,23 +107,22 @@ def load_YOLO(model_architecture, model_weights):
 
 load_YOLO(args.input_files[1], args.input_files[0])
 
-print(args.input_files[3:])
-
 # Check if image file is valid
 def read_img(image_path_arr):
-    fig, ax = plt.subplots(1, len(image_path_arr), figsize=(20, 20))
+    fig, ax = plt.subplots(1, len(image_path_arr), figsize=(20, 20), squeeze=False)
+    
     for i, image_path in enumerate(image_path_arr):
         try:
             image = cv2.imread(image_path)
-            ax[i].axis('off')
-            ax[i].imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            ax[0][i].axis('off')
+            ax[0][i].imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         except:
             print(f"Invalid Input Image {image_path}")
             exit(0)
         
     plt.show()
 
-read_img(args.input_files[3:])
+read_img(imgs)
 
 # Convert Image to Blob
 
