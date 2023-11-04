@@ -25,7 +25,7 @@ import pandas as pd
 """
 
 """
-    python3 yolo_img_detector  <Weights file>   <config file>   <labels file>  <Image/Images path> \
+    python3 yolo_img_detector.py  <Weights file>   <config file>   <labels file>  <Images/Image dir> \
                                 -inf  -classes_im 
 
     Default:
@@ -49,10 +49,10 @@ import pandas as pd
 parser = argparse.ArgumentParser(description="Command-Line Parser")
 
 # Define a positional argument, our input_file
-parser.add_argument('input_files', nargs='+', type=str, help='<Weights file>   <config file>   <labels file>  <Image/Images path>')
-parser.add_argument('-inf', action = "store_true", help="Display average inference time")
-parser.add_argument('-classes_all', action = "store_true", help="Display all classes detected")
-parser.add_argument('-classes_im', action = "store_true", help = "Classes per image, per image breakdown")
+parser.add_argument('input_files', nargs='+', type=str, help='<Weights file>   <config file>   <labels file>  <Images/Image dir>')
+parser.add_argument('-inf', action = "store_true", help="print average inference time")
+parser.add_argument('-classes_all', action = "store_true", help="print all classes detected")
+parser.add_argument('-classes_im', action = "store_true", help = "print classes per image")
 
 
 args = parser.parse_args()
@@ -78,8 +78,6 @@ else:
             exit(0)
     imgs = args.input_files[3:]
 
-print(imgs)
-
 try:
     labels = pd.read_csv(args.input_files[2])
 except:
@@ -87,7 +85,6 @@ except:
     exit(0)
 
 
-print(args.input_files)
 if args.classes_im:
     print("classes_im is selected")
 if args.classes_all:
@@ -105,7 +102,6 @@ def load_YOLO(model_architecture, model_weights):
     layers = network.getLayerNames()
     yolo_layers = ['yolo_82', 'yolo_94', 'yolo_106']
 
-load_YOLO(args.input_files[1], args.input_files[0])
 
 # Check if image file is valid
 def read_img(image_path_arr):
@@ -121,6 +117,8 @@ def read_img(image_path_arr):
             exit(0)
         
     plt.show()
+
+load_YOLO(args.input_files[1], args.input_files[0])
 
 read_img(imgs)
 
