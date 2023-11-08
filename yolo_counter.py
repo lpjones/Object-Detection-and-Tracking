@@ -106,49 +106,6 @@ def imgs_to_network(blob_imgs, yolo_layers, network):
         outputs.append(output)
     return outputs, sum(times) / len(times)
 
-
-
-def draw_image(image, output, labels):
-    # Define variables for drawing on image
-    bounding_boxes = []
-    confidences = []
-    classes = []
-    probability_minimum = 0.5
-    threshold = 0.3
-    h, w = image.shape[:2]
-    # Get bounding boxes, confidences and classes
-    for result in output:
-        for detection in result:
-            scores = detection[5:]
-            class_current = np.argmax(scores)
-            confidence_current = scores[class_current]
-            if confidence_current > probability_minimum:
-                box_current = detection[0:4] * np.array([w, h, w, h])
-                x_center, y_center, box_width, box_height = box_current.astype('int')
-                x_min = int(x_center - (box_width / 2))
-                y_min = int(y_center - (box_height / 2))
-                bounding_boxes.append([x_min, y_min, int(box_width), int(box_height)])
-                confidences.append(float(confidence_current))
-                classes.append(class_current)
-    
-    # Draw bounding boxes and information on images
-    results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, probability_minimum, threshold)
-    coco_labels = 80
-    np.random.seed(42)
-    colours = np.random.randint(0, 255, size=(coco_labels, 3), dtype='uint8')
-    # Track number of each class predicted per image
-    if len(results) > 0:
-        for i in results.flatten(): # i is the value, , not the index of the results array
-            if labels[0][classes[i]] == 'person':
-                x_min, y_min = bounding_boxes[i][0], bounding_boxes[i][1]
-                box_width, box_height = bounding_boxes[i][2], bounding_boxes[i][3]
-                colour_box = [int(j) for j in colours[classes[i]]]
-                cv2.rectangle(image, (x_min, y_min), (x_min + box_width, y_min + box_height), colour_box, 5)
-                text_box = labels[0][classes[i]] + ': {:.2f}'.format(confidences[i])
-                cv2.putText(image, text_box, (x_min, y_min - 7), cv2.FONT_HERSHEY_SIMPLEX, .75, colour_box, 2)
-    return image
-
-
 video, labels = check_input_paths(args)
 
 yolo_layers, network = load_YOLO(args.input_files[1], args.input_files[0])
@@ -212,37 +169,30 @@ def draw_tracking_results(image, box_tracker, labels, classes, confidences,     
 
     trackers = box_tracker.update(np.array(filtered_bound_boxes))
     trackers = trackers[::-1]
-    id_itr = 0
 
-    # Track number of each class predicted per image
-    if len(results) > 0:
-        for i in results.flatten(): # i is the value, , not the index of the results array
-            if labels[0][classes[i]] == 'person':
-                
-                print("Current Bounding array")
-                print(bounding_boxes[i])
-                print("----------------------------------")
+    print(len(trackers))
+    print("Current tracker array: ")
+    print(trackers)
+    print("----------------------------------")
 
-                #trackers = box_tracker.update(np.array(bounding_boxes)) # Update tracker with filtered bounding boxes
+    # TODO: For some reason on the 14th frame IDs 1 and 2 switch.
+    for i in range(len(trackers)):
+        print("Current Bounding array")
+        print(filtered_bound_boxes[i])
+        print("----------------------------------")
 
-                print("Current tracker array: ")
-                print(trackers)
-                print("----------------------------------")
+        x_min, y_min = int(trackers[i][2]), int(trackers[i][3])
+        x_max, y_max = int(trackers[i][0]), int(trackers[i][1])
+        colour_box = (0, 255, 255)
 
-                x_min, y_min = bounding_boxes[i][0], bounding_boxes[i][1]
-                x_max, y_max = bounding_boxes[i][2], bounding_boxes[i][3]
-                colour_box = [int(j) for j in colours[classes[i]]]
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), colour_box, 5)
 
-                cv2.rectangle(image, (x_min, y_min), (x_max, y_max), colour_box, 5)
+        text_box = '{}'.format(int(trackers[i][4]))
 
-                text_box = 'ID: {}'.format(int(trackers[id_itr][4])) # TODO: Fix this to match the correct ID.
-                cv2.putText(image, text_box, (x_min, y_min - 7), cv2.FONT_HERSHEY_SIMPLEX, .75, colour_box, 2)
+        cv2.putText(image, text_box, (x_max, y_max - 7), cv2.FONT_HERSHEY_SIMPLEX, .75, colour_box, 2)
 
-                id_itr += 1
-
-    print("Number of times iterated")
-    print(id_itr)
-    return image, box_tracker # Do I need to return box_tracker for it to properly track the IDs?
+    # TODO: Maybe count the length of the trackers array to count people?
+    return image#, box_tracker # Do I need to return box_tracker for it to properly track the IDs?
 
 
 
@@ -258,8 +208,8 @@ for i, frame in enumerate(video_frames): # Loop through all frames in the video
 
     bounding_boxes, classes, confidences, probability_minimum, threshold = get_bounding_boxes(frame, outputs[0])
 
-    boxed_frame, box_tracker = draw_tracking_results(frame, box_tracker, labels, classes, confidences, probability_minimum, threshold)
+    boxed_frame = draw_tracking_results(frame, box_tracker, labels, classes, confidences, probability_minimum, threshold)
 
     cv2.imshow('Frame', boxed_frame)
-    if cv2.waitKey(5000) == ord('q'):
+    if cv2.waitKey(1) == ord('q'):
         break
