@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser(description="Command-Line Parser")
 
 # Define a positional argument, our input_file
-parser.add_argument('input_files', nargs='+', type=str, help='<Weights file>   <config file>   <labels file>  <Images/Image dir>')
+parser.add_argument('input_files', nargs=4, type=str, help='<Weights file>   <config file>   <labels file>  <Video Path>')
 parser.add_argument('-inf', action = "store_true", help="print average inference time")
 parser.add_argument('-classes_all', action = "store_true", help="print all classes detected")
 parser.add_argument('-classes_im', action = "store_true", help = "print classes per image")
@@ -33,7 +33,7 @@ args = parser.parse_args()
 def check_input_paths(args):
     # Check for correct num of arguments
     if len(args.input_files) != 4:
-        print("Invalid number of input files. Need at 4\n \
+        print("Invalid number of input files. Need 4\n \
                 <Weights file>   <config file>   <labels file>  <Video Path>")
         exit(0)
 
@@ -79,10 +79,6 @@ def read_video(video_path):
         
         frames.append(frame) # Store frame into array
         
-        #cv2.imshow('Frame', frame)
-        #if cv2.waitKey(25) == ord('q'):
-        #    break
-        
     return frames
 
 
@@ -97,7 +93,7 @@ def imgs_to_network(blob_imgs, yolo_layers, network):
     outputs = []
     times = []
     for im in blob_imgs:
-        print(np.array(im).shape)
+        #print(np.array(im).shape)
         network.setInput(im)
         start_time = time.time()
         output = network.forward(yolo_layers)
@@ -111,8 +107,6 @@ video, labels = check_input_paths(args)
 yolo_layers, network = load_YOLO(args.input_files[1], args.input_files[0])
 
 video_frames = read_video(video)
-
-print(np.array(video_frames[0]).shape)
 
 def get_bounding_boxes(image, output):
     # Define variables for drawing on image
@@ -139,10 +133,8 @@ def get_bounding_boxes(image, output):
 
     return bounding_boxes, classes, confidences, probability_minimum, threshold
 
-def draw_tracking_results(image, box_tracker, labels, classes, confidences,     probability_minimum, threshold):
+def draw_tracking_results(image, box_tracker, labels, classes, confidences, probability_minimum, threshold, max):
 
-    print("bounding boxes before:")
-    print(bounding_boxes)
     # Draw bounding boxes and information on images
     results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, probability_minimum, threshold) # NMSBoxes filters out duplicate boxes
 
@@ -150,36 +142,21 @@ def draw_tracking_results(image, box_tracker, labels, classes, confidences,     
     np.random.seed(42)
     colours = np.random.randint(0, 255, size=(coco_labels, 3), dtype='uint8')
 
-    filtered_bound_boxes = []
+    filtered_bound_boxes = [] # Only contains bounding boxes with people in them
     if len(results) > 0:
-        for i in results.flatten():
-            if labels[0][classes[i]] == 'person':
+        for i in results.flatten(): 
+            if labels[0][classes[i]] == 'person': 
                 filtered_bound_boxes.append(bounding_boxes[i])
 
-    print("Bounding boxes after:")
-    print(filtered_bound_boxes)
-
-    # Convert format to put into trackers
+    # Convert format to put into trackers update function
     for filtered_box in filtered_bound_boxes:
         filtered_box[2] = filtered_box[0] + filtered_box[2]
         filtered_box[3] = filtered_box[1] + filtered_box[3]
 
-    print("Converted Bounding Boxes for input to tracker:")
-    print(filtered_bound_boxes)
+    trackers = box_tracker.update(np.array(filtered_bound_boxes)) # Pass boxes into the tracker
+    trackers = trackers[::-1] 
 
-    trackers = box_tracker.update(np.array(filtered_bound_boxes))
-    trackers = trackers[::-1]
-
-    print(len(trackers))
-    print("Current tracker array: ")
-    print(trackers)
-    print("----------------------------------")
-
-    # TODO: For some reason on the 14th frame IDs 1 and 2 switch.
     for i in range(len(trackers)):
-        print("Current Bounding array")
-        print(filtered_bound_boxes[i])
-        print("----------------------------------")
 
         x_min, y_min = int(trackers[i][2]), int(trackers[i][3])
         x_max, y_max = int(trackers[i][0]), int(trackers[i][1])
@@ -187,29 +164,45 @@ def draw_tracking_results(image, box_tracker, labels, classes, confidences,     
 
         cv2.rectangle(image, (x_min, y_min), (x_max, y_max), colour_box, 5)
 
-        text_box = '{}'.format(int(trackers[i][4]))
+        text_box = '{}'.format(int(trackers[i][4])) # Print out ID of tracked person
 
         cv2.putText(image, text_box, (x_max, y_max - 7), cv2.FONT_HERSHEY_SIMPLEX, .75, colour_box, 2)
 
-    # TODO: Maybe count the length of the trackers array to count people?
-    return image#, box_tracker # Do I need to return box_tracker for it to properly track the IDs?
+    if int(trackers[-1][4]) > max:
+        max = int(trackers[-1][4])
+        
+    person_counter_text_box =  'People: {}'.format(max)
 
+    cv2.putText(image, person_counter_text_box, (np.array(video_frames)[0].shape[1]//2-20, 20), cv2.FONT_HERSHEY_SIMPLEX, .75, (0,255,0), 2)
+    return image, max
 
+video_dimm = np.array(video_frames)[0].shape[0:2]
 
-print("Num Video Frames: %d" % len(video_frames))
-
+boxed_frame_arr = [] 
 box_tracker = Sort() # Create instance of SORT
-
+max = 0
 for i, frame in enumerate(video_frames): # Loop through all frames in the video
 
-    imgs_blob = im2Blob(frame)
+    imgs_blob = im2Blob(frame) # Convert to blob
 
     outputs, avg_time = imgs_to_network(imgs_blob, yolo_layers, network) # Inferences are the outputs
 
     bounding_boxes, classes, confidences, probability_minimum, threshold = get_bounding_boxes(frame, outputs[0])
 
-    boxed_frame = draw_tracking_results(frame, box_tracker, labels, classes, confidences, probability_minimum, threshold)
+    boxed_frame, max = draw_tracking_results(frame, box_tracker, labels, classes, confidences, probability_minimum, threshold, max)
 
-    cv2.imshow('Frame', boxed_frame)
-    if cv2.waitKey(1) == ord('q'):
-        break
+    boxed_frame_arr.append(boxed_frame)
+
+# Show the video, used boxed_frame_arr to make video
+result = cv2.VideoWriter('mot_vid/MOTS20-09-result.mp4',  
+                         cv2.VideoWriter_fourcc(*'mp4v'), 
+                         30.0, video_dimm[::-1]) 
+
+for frame in boxed_frame_arr:
+    result.write(frame)
+    
+  
+# When everything done, release  
+# the video capture and video  
+# write objects 
+result.release() 
