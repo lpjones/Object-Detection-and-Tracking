@@ -30,7 +30,6 @@ parser.add_argument('-classes_im', action = "store_true", help = "print classes 
 args = parser.parse_args()
 
 
-
 def check_input_paths(args):
     # Check for correct num of arguments
     if len(args.input_files) != 4:
@@ -71,7 +70,7 @@ def read_video(video_path):
             print(f"Invalid Video {video_path}")
             exit(0)
 
-    while(video.isOpened()):
+    while(True):
         ret, frame = video.read()
         
         if not ret: # TODO: See how to implement an end of video
@@ -131,7 +130,7 @@ def draw_image(image, output, labels):
                 bounding_boxes.append([x_min, y_min, int(box_width), int(box_height)])
                 confidences.append(float(confidence_current))
                 classes.append(class_current)
-
+    
     # Draw bounding boxes and information on images
     results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, probability_minimum, threshold)
     coco_labels = 80
@@ -158,15 +157,109 @@ video_frames = read_video(video)
 
 print(np.array(video_frames[0]).shape)
 
-for i, frames in enumerate(video_frames): # Loop through all frames in the video
+def get_bounding_boxes(image, output):
+    # Define variables for drawing on image
+    bounding_boxes = []
+    confidences = []
+    classes = []
+    probability_minimum = 0.5
+    threshold = 0.3
+    h, w = image.shape[:2]
+    # Get bounding boxes, confidences and classes
+    for result in output:
+        for detection in result:
+            scores = detection[5:]
+            class_current = np.argmax(scores)
+            confidence_current = scores[class_current]
+            if confidence_current > probability_minimum:
+                box_current = detection[0:4] * np.array([w, h, w, h])
+                x_center, y_center, box_width, box_height = box_current.astype('int')
+                x_min = int(x_center - (box_width / 2))
+                y_min = int(y_center - (box_height / 2))
+                bounding_boxes.append([x_min, y_min, int(box_width), int(box_height)])
+                confidences.append(float(confidence_current))
+                classes.append(class_current)
 
-    imgs_blob = im2Blob(frames)
+    return bounding_boxes, classes, confidences, probability_minimum, threshold
+
+def draw_tracking_results(image, box_tracker, labels, classes, confidences,     probability_minimum, threshold):
+
+    print("bounding boxes before:")
+    print(bounding_boxes)
+    # Draw bounding boxes and information on images
+    results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, probability_minimum, threshold) # NMSBoxes filters out duplicate boxes
+
+    coco_labels = 80
+    np.random.seed(42)
+    colours = np.random.randint(0, 255, size=(coco_labels, 3), dtype='uint8')
+
+    filtered_bound_boxes = []
+    if len(results) > 0:
+        for i in results.flatten():
+            if labels[0][classes[i]] == 'person':
+                filtered_bound_boxes.append(bounding_boxes[i])
+
+    print("Bounding boxes after:")
+    print(filtered_bound_boxes)
+
+    # Convert format to put into trackers
+    for filtered_box in filtered_bound_boxes:
+        filtered_box[2] = filtered_box[0] + filtered_box[2]
+        filtered_box[3] = filtered_box[1] + filtered_box[3]
+
+    print("Converted Bounding Boxes for input to tracker:")
+    print(filtered_bound_boxes)
+
+    trackers = box_tracker.update(np.array(filtered_bound_boxes))
+    trackers = trackers[::-1]
+    id_itr = 0
+
+    # Track number of each class predicted per image
+    if len(results) > 0:
+        for i in results.flatten(): # i is the value, , not the index of the results array
+            if labels[0][classes[i]] == 'person':
+                
+                print("Current Bounding array")
+                print(bounding_boxes[i])
+                print("----------------------------------")
+
+                #trackers = box_tracker.update(np.array(bounding_boxes)) # Update tracker with filtered bounding boxes
+
+                print("Current tracker array: ")
+                print(trackers)
+                print("----------------------------------")
+
+                x_min, y_min = bounding_boxes[i][0], bounding_boxes[i][1]
+                x_max, y_max = bounding_boxes[i][2], bounding_boxes[i][3]
+                colour_box = [int(j) for j in colours[classes[i]]]
+
+                cv2.rectangle(image, (x_min, y_min), (x_max, y_max), colour_box, 5)
+
+                text_box = 'ID: {}'.format(int(trackers[id_itr][4])) # TODO: Fix this to match the correct ID.
+                cv2.putText(image, text_box, (x_min, y_min - 7), cv2.FONT_HERSHEY_SIMPLEX, .75, colour_box, 2)
+
+                id_itr += 1
+
+    print("Number of times iterated")
+    print(id_itr)
+    return image, box_tracker # Do I need to return box_tracker for it to properly track the IDs?
+
+
+
+print("Num Video Frames: %d" % len(video_frames))
+
+box_tracker = Sort() # Create instance of SORT
+
+for i, frame in enumerate(video_frames): # Loop through all frames in the video
+
+    imgs_blob = im2Blob(frame)
 
     outputs, avg_time = imgs_to_network(imgs_blob, yolo_layers, network) # Inferences are the outputs
 
-    box_tracker = Sort()
+    bounding_boxes, classes, confidences, probability_minimum, threshold = get_bounding_boxes(frame, outputs[0])
 
-    a = box_tracker.update(outputs[i])
+    boxed_frame, box_tracker = draw_tracking_results(frame, box_tracker, labels, classes, confidences, probability_minimum, threshold)
 
-    print(a)
-    boxed_frame = draw_image(frames, outputs[i], labels)
+    cv2.imshow('Frame', boxed_frame)
+    if cv2.waitKey(5000) == ord('q'):
+        break
