@@ -181,7 +181,6 @@ boxed_frame_arr = []
 box_tracker = Sort() # Create instance of SORT
 max = 0
 
-video_frames = video_frames[0:15]
 for i, frame in enumerate(video_frames): # Loop through all frames in the video
 
     imgs_blob = im2Blob(frame) # Convert to blob
