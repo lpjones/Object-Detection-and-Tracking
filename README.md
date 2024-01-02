@@ -16,12 +16,6 @@ Usage:
 ```console
 python3 yolo_counter.py yolo_files/yolov3.weights yolo_files/yolov3.cfg yolo_files/coco.names mot_vid/MOTS20-09-raw.mp4
 ```
-Libraries: \
-os \
-opencv2 \
-numpy \
-pandas \
-matplotlib
 
 yolo_img_detector.py: \
 Takes in weights file, config file, labels file, and images
@@ -32,6 +26,14 @@ Usage:
 ```console
 python3 yolo_img_detector.py yolo_files/yolov3.weights yolo_files/yolov3.cfg yolo_files/coco.names imgs/ -classes_im -inf
 ```
+
+Libraries: \
+os \
+opencv2 \
+numpy \
+pandas \
+matplotlib \
+argparse
 
 
 # Instructions (Do not clone this repo!)
