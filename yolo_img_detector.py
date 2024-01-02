@@ -134,7 +134,6 @@ def imgs_to_network(blob_imgs, yolo_layers, network):
     outputs = []
     times = []
     for im in blob_imgs:
-        print(np.array(im).shape)
         network.setInput(im)
         start_time = time.time()
         output = network.forward(yolo_layers)
@@ -196,8 +195,6 @@ imgs, labels = check_input_paths(args)
 yolo_layers, network = load_YOLO(args.input_files[1], args.input_files[0])
 
 imgs_cv2 = read_img(imgs)
-
-print(np.array(imgs_cv2[0]).shape)
 
 imgs_blob = im2Blob(imgs_cv2)
 

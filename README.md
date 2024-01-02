@@ -8,7 +8,7 @@ yolo_counter.py \
 yolo_img_detector.py
 
 yolo_counter.py: \
-Takes in weights file, config file, labels  file, and video path
+Takes in weights file, config file, labels file, and video path
 
 Takes in a video and counts how many people show up in the image
 
@@ -22,6 +22,17 @@ opencv2 \
 numpy \
 pandas \
 matplotlib
+
+yolo_img_detector.py: \
+Takes in weights file, config file, labels file, and images
+
+Takes in images and outputs the original image with bounding boxes identifying classes within each image and their confidence values
+
+Usage:
+```console
+python3 yolo_img_detector.py yolo_files/yolov3.weights yolo_files/yolov3.cfg yolo_files/coco.names imgs/ -classes_im -inf
+```
+
 
 # Instructions (Do not clone this repo!)
 
